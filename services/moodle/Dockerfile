@@ -8,11 +8,11 @@ WORKDIR /srv
 COPY shared /srv/shared
 RUN pip install --no-cache-dir /srv/shared
 
-COPY services/auth/requirements.txt /srv/requirements.txt
+COPY services/moodle/requirements.txt /srv/requirements.txt
 RUN pip install --no-cache-dir -r /srv/requirements.txt
 
-COPY services/auth/auth_app /srv/auth_app
+COPY services/moodle/moodle_app /srv/moodle_app
 
 # Сервис не публикуется наружу — снаружи только gateway.
-EXPOSE 8001
-CMD ["uvicorn", "auth_app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+EXPOSE 8002
+CMD ["uvicorn", "moodle_app.main:app", "--host", "0.0.0.0", "--port", "8002"]
