@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Moodle — проверка API</title>
+<style>
+  :root{--ink:#16233B;--muted:#6C7A90;--paper:#FBFAF6;--line:#E3E1D9;--blue:#2F5DE0;--red:#C0392B;--green:#1F7A5A;--card:#fff;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Golos Text',ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--paper);
+    background-image:linear-gradient(rgba(22,35,59,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(22,35,59,.05) 1px,transparent 1px);
+    background-size:26px 26px;-webkit-font-smoothing:antialiased;line-height:1.4;}
+  .wrap{max-width:760px;margin:0 auto;padding:28px 18px 80px}
+  h1{font-size:24px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px}
+  .rowin{display:flex;gap:8px;flex-wrap:wrap}
+  input[type=text]{flex:1;min-width:220px;font-size:15px;font-family:inherit;color:var(--ink);padding:12px 13px;border:1px solid var(--line);border-radius:10px;background:#fff;outline:none;}
+  input:focus{border-color:var(--ink)}
+  button{font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;border:none;background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:10px;}
+  button.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);font-weight:400}
+  button:disabled{opacity:.4;cursor:default}
+  .note{font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.5}
+  .warn{background:#FFF3E0;border:1px solid #F0D9A8;color:#7A5A12;font-size:13px;padding:11px 13px;border-radius:10px;margin-bottom:16px}
+  .ok{background:#E8F5EE;border:1px solid #B6DEC8;color:#1F5B41;font-size:13px;padding:10px 13px;border-radius:10px;margin-bottom:16px;display:none}
+  .err{background:#FDECEA;border:1px solid #F2C1BC;color:#8A2A1E;font-size:13.5px;padding:11px 13px;border-radius:10px;margin-top:12px;white-space:pre-wrap}
+  .tabs{display:flex;gap:6px;margin:4px 0 16px;flex-wrap:wrap}
+  .tab{background:#fff;border:1px solid var(--line);color:var(--muted);padding:8px 14px;border-radius:999px;font-size:13.5px;font-weight:400}
+  .tab.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .who{display:flex;align-items:center;gap:12px}
+  .who img{width:46px;height:46px;border-radius:50%;object-fit:cover;background:#eee}
+  .who .n{font-weight:600}.who .m{font-size:13px;color:var(--muted)}
+  .course{border:1px solid var(--line);border-radius:11px;padding:13px 14px;margin-bottom:10px}
+  .course .t{font-weight:600;margin-bottom:2px}.course .m{font-size:12.5px;color:var(--muted)}
+  .grade{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .grade:last-child{border-bottom:none}.grade .g{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .file{display:flex;gap:9px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+  .file:last-child{border-bottom:none}.file a{color:var(--blue);text-decoration:none;word-break:break-all}.file .c{color:var(--muted);font-size:12px;flex:none}
+  .ev{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .ev:last-child{border-bottom:none}.ev .d{color:var(--muted);font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  h2{font-size:15px;font-weight:600;margin:0 0 12px}
+  .empty{color:var(--muted);font-size:14px;padding:8px 0}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid rgba(22,35,59,.25);border-top-color:var(--ink);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:7px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  code{background:rgba(22,35,59,.06);padding:1px 6px;border-radius:5px;font-size:12.5px}
+  details{margin-top:14px}summary{cursor:pointer;font-size:13px;color:var(--muted)}
+  pre{background:#0f1626;color:#cdd6e6;padding:14px;border-radius:10px;overflow:auto;font-size:12px;max-height:340px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Moodle — проверка API</h1>
+  <p class="sub">Работает через локальный посредник на 127.0.0.1:8765. Токен остаётся у тебя.</p>
+
+  <div class="warn">Перед загрузкой запусти команду-посредник в Терминале (я её дал в чате). Без неё браузер блокирует запрос к Moodle.</div>
+  <div class="ok" id="okbar">Посредник на связи.</div>
+
+  <div class="card">
+    <label>Адрес Moodle</label>
+    <div class="rowin" style="margin-bottom:14px"><input type="text" id="site" value="https://moodle.sdu.edu.kz" /></div>
+    <label>Токен (moodle_mobile_app)</label>
+    <div class="rowin">
+      <input type="text" id="token" placeholder="вставь токен сюда" autocomplete="off" spellcheck="false" />
+      <button id="go" onclick="run()">Загрузить</button>
+    </div>
+    <div class="note">Токен вводится здесь, у тебя в браузере. В чат его не отправляй.</div>
+    <div id="err"></div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const PROXY = 'http://127.0.0.1:8765/proxy?u=';
+let RAW = {};
+function siteBase(){ return $('site').value.trim().replace(/\/+$/,''); }
+
+async function call(fn, params={}){
+  const base = siteBase();
+  const token = $('token').value.trim();
+  const u = new URL(base + '/webservice/rest/server.php');
+  u.searchParams.set('wstoken', token);
+  u.searchParams.set('wsfunction', fn);
+  u.searchParams.set('moodlewsrestformat', 'json');
+  for(const k in params) u.searchParams.set(k, params[k]);
+  const r = await fetch(PROXY + encodeURIComponent(u.toString()));
+  const text = await r.text();
+  let j; try{ j = JSON.parse(text); }catch(e){ throw new Error('proxy: '+text.slice(0,200)); }
+  RAW[fn] = j;
+  if(j && j.exception){ const e = new Error(j.message||j.errorcode||'Ошибка Moodle'); e.moodle=j; throw e; }
+  return j;
+}
+async function ping(){
+  try{ const r = await fetch(PROXY + encodeURIComponent('https://moodle.sdu.edu.kz/login/index.php'));
+    if(r.ok){ $('okbar').style.display='block'; return true; } }catch(e){}
+  return false;
+}
+ping();
+function fmtDate(u){ if(!u) return ''; const d=new Date(u*1000); const p=n=>String(n).padStart(2,'0');
+  return `${p(d.getDate())}.${p(d.getMonth()+1)} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+let TAB='courses', SITE=null, COURSES=[], GRADES=[], FILES=[], EVENTS=[];
+
+async function run(){
+  const token = $('token').value.trim();
+  $('err').innerHTML='';
+  if(!token){ $('err').innerHTML='<div class="err">Вставь токен.</div>'; return; }
+  $('go').disabled=true;
+  $('out').innerHTML='<div class="card"><span class="spin"></span>Соединяюсь с Moodle…</div>';
+  try{ SITE = await call('core_webservice_get_site_info'); }
+  catch(e){
+    $('go').disabled=false; $('out').innerHTML='';
+    let hint = explain(e);
+    if((e.message||'').startsWith('proxy') || e.message==='Failed to fetch')
+      hint = 'Похоже, посредник не запущен. Вставь команду в Терминал, не закрывай его, потом обнови страницу.';
+    $('err').innerHTML='<div class="err">Не удалось.\n\n'+esc(hint)+'</div>'; return;
+  }
+  try{ COURSES = await call('core_enrol_get_users_courses',{userid:SITE.userid})||[]; }catch(e){ COURSES=[]; }
+  GRADES=[];
+  for(const c of COURSES){
+    try{
+      const g = await call('gradereport_user_get_grade_items',{courseid:c.id,userid:SITE.userid});
+      const items=(g.usergrades&&g.usergrades[0]&&g.usergrades[0].gradeitems)||[];
+      items.forEach(it=>{ if(it.itemtype==='course'||(it.gradeformatted&&it.gradeformatted!=='-')){
+        GRADES.push({course:c.shortname||c.fullname,name:it.itemname||(it.itemtype==='course'?'Итог по курсу':'—'),
+          grade:it.gradeformatted,range:(it.grademin!=null&&it.grademax!=null)?`${it.grademin}–${it.grademax}`:''}); } });
+    }catch(e){}
+  }
+  FILES=[];
+  for(const c of COURSES){
+    try{
+      const sections = await call('core_course_get_contents',{courseid:c.id})||[];
+      sections.forEach(sec=>(sec.modules||[]).forEach(m=>(m.contents||[]).forEach(f=>{
+        if(f.fileurl) FILES.push({course:c.shortname||c.fullname,name:f.filename||m.name,url:f.fileurl}); })));
+    }catch(e){}
+  }
+  try{
+    const ev = await call('core_calendar_get_action_events_by_timesort',{timesortfrom:Math.floor(Date.now()/1000)});
+    EVENTS=(ev.events||[]).map(e=>({name:e.name,course:(e.course&&e.course.shortname)||'',when:e.timesort}));
+  }catch(e){ EVENTS=[]; }
+  $('go').disabled=false; render();
+}
+function explain(e){
+  const m=e.moodle||{};
+  if(m.errorcode==='invalidtoken') return 'Токен недействителен или сброшен. Получи новый.';
+  if(m.errorcode==='accessexception') return 'Токен принят, но у этой функции нет прав. API включён частично.';
+  return (e.message||'')+(m.errorcode?` [${m.errorcode}]`:'');
+}
+function render(){
+  let h='';
+  h+='<div class="card"><div class="who">';
+  if(SITE.userpictureurl) h+=`<img src="${PROXY+encodeURIComponent(SITE.userpictureurl+'?token='+$('token').value.trim())}" alt="">`;
+  h+=`<div><div class="n">${esc(SITE.fullname)}</div><div class="m">${esc(SITE.sitename)} · ${COURSES.length} курс(ов)</div></div></div></div>`;
+  h+='<div class="tabs">';
+  [['courses','Курсы',COURSES.length],['grades','Оценки',GRADES.length],['files','Файлы',FILES.length],['events','Дедлайны',EVENTS.length]]
+    .forEach(([k,l,n])=>h+=`<button class="tab${TAB===k?' on':''}" onclick="TAB='${k}';render()">${l} · ${n}</button>`);
+  h+='</div><div class="card">';
+  if(TAB==='courses'){ h+='<h2>Твои курсы</h2>';
+    if(!COURSES.length)h+='<div class="empty">Курсов не пришло.</div>';
+    COURSES.forEach(c=>h+=`<div class="course"><div class="t">${esc(c.fullname)}</div><div class="m">${esc(c.shortname||'')}</div></div>`); }
+  if(TAB==='grades'){ h+='<h2>Оценки</h2>';
+    if(!GRADES.length)h+='<div class="empty">Оценок нет или API их не отдаёт.</div>';
+    GRADES.forEach(g=>h+=`<div class="grade"><span>${esc(g.course)} — ${esc(g.name)}</span><span class="g">${esc(g.grade||'—')}${g.range?` <span style="color:var(--muted);font-weight:400">/ ${esc(g.range)}</span>`:''}</span></div>`); }
+  if(TAB==='files'){ h+='<h2>Файлы и материалы</h2>';
+    if(!FILES.length)h+='<div class="empty">Файлов не пришло или нет доступа к содержимому.</div>';
+    FILES.forEach(f=>{ const sep=f.url.includes('?')?'&':'?'; const link=f.url+sep+'token='+encodeURIComponent($('token').value.trim());
+      h+=`<div class="file"><span class="c">${esc(f.course)}</span><a href="${PROXY+encodeURIComponent(link)}" target="_blank" rel="noopener">${esc(f.name)}</a></div>`; }); }
+  if(TAB==='events'){ h+='<h2>Ближайшие дедлайны</h2>';
+    if(!EVENTS.length)h+='<div class="empty">Событий с датами нет.</div>';
+    EVENTS.sort((a,b)=>a.when-b.when).forEach(e=>h+=`<div class="ev"><span>${esc(e.course?e.course+' — ':'')}${esc(e.name)}</span><span class="d">${fmtDate(e.when)}</span></div>`);
+    if(EVENTS.length){
+      const exp=EVENTS.slice().sort((a,b)=>a.when-b.when).map(e=>{const d=new Date(e.when*1000);
+        const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        return `${iso} | ${e.course||''} | ${e.name}`;}).join('\n');
+      h+=`<button class="ghost" style="margin-top:8px" onclick="navigator.clipboard.writeText(this.dataset.x).then(()=>this.textContent='Скопировано')" data-x="${esc(exp)}">Скопировать для импорта в трекер</button>`;
+    } }
+  h+='</div><details><summary>Показать сырой ответ Moodle (без токена)</summary><pre>'+esc(JSON.stringify(RAW,null,2))+'</pre></details>';
+  $('out').innerHTML=h;
+}
+</script>
+</body>
+</html>
