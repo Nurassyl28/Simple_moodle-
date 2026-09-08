@@ -20,3 +20,7 @@ pgdata/
 .idea/
 .vscode/
 .DS_Store
+
+# Фронтенд
+node_modules/
+dist/

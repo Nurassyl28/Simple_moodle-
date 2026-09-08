@@ -109,7 +109,24 @@ Moodle всё отображается. → Это то, что уже почт�
 - `docs/it-request.md` — шаблон обращения в IT-отдел SDU.
 - `docs/moodle-api-notes.md` — проверенные запросы Moodle с примерами.
 - `legacy/moodle-probe.html` — рабочий прототип, которым всё проверено.
-- `legacy/homework-tracker.jsx` — готовый трекер домашки/дел (React).
+- `legacy/homework-tracker.jsx` — исходный трекер домашки/дел, перенесён в `web/`.
+- `services/` — микросервисы: gateway, auth, moodle, tracker.
+- `shared/` — общий код сервисов.
+- `web/` — фронтенд (Vite + React).
+
+## Как запустить
+
+```bash
+cp .env.example .env          # заполнить TOKEN_ENCRYPTION_KEY и INTERNAL_API_KEY
+make up                       # postgres + auth + moodle + tracker + gateway
+npm --prefix web install
+npm --prefix web run dev      # http://localhost:5173
+```
+
+Команды генерации секретов — в `.env.example`. Проверить, что бэкенд жив:
+`curl http://localhost:8000/api/health`.
+
+Тесты: `pytest` из корня.
 
 ## Как дать это Claude Code
 
