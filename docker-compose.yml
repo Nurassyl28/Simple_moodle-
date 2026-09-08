@@ -54,5 +54,22 @@ services:
       timeout: 5s
       retries: 5
 
+  tracker:
+    build:
+      context: .
+      dockerfile: services/tracker/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8003/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:
