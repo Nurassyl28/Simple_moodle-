@@ -1,0 +1,11 @@
+# Настройки инструментов разработки. Сами сервисы собираются своими Dockerfile.
+
+[tool.pytest.ini_options]
+# Чтобы тесты видели общий пакет без установки: pytest из корня репозитория.
+pythonpath = ["shared"]
+testpaths = ["shared/tests", "services"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
