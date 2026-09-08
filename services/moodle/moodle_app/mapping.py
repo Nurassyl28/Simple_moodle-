@@ -54,7 +54,8 @@ def grades_from(course_name: str, raw: dict) -> list[Grade]:
             Grade(
                 course=course_name,
                 # itemtype "course" — итог за курс, у него itemname пустой.
-                item=item.get("itemname") or ("Итог за курс" if item.get("itemtype") == "course" else ""),
+                item=item.get("itemname")
+                or ("Итог за курс" if item.get("itemtype") == "course" else ""),
                 grade=grade,
                 range=f"{_num(grademin)}–{_num(grademax)}" if grademax is not None else None,
                 is_total=item.get("itemtype") == "course",

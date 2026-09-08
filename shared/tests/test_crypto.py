@@ -1,5 +1,4 @@
 import pytest
-
 from sduhub_common.crypto import TokenCipher, TokenDecryptionError
 
 

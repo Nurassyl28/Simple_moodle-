@@ -77,9 +77,10 @@ services:
       dockerfile: services/gateway/Dockerfile
     restart: unless-stopped
     env_file: .env
-    # Единственный сервис, опубликованный наружу.
+    # Наружу публикуется только для отладки curl-ом: браузер ходит через web,
+    # который отдаёт фронт и /api с одного адреса.
     ports:
-      - "${GATEWAY_PORT:-8000}:8000"
+      - "127.0.0.1:${GATEWAY_PORT:-8000}:8000"
     depends_on:
       auth:
         condition: service_healthy
@@ -92,6 +93,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-5173}:80"
 
 volumes:
   pgdata:

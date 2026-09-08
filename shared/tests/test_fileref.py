@@ -1,12 +1,14 @@
 import time
 
 import pytest
-
 from sduhub_common.fileref import FileRefError, make_ref, read_ref
 
 KEY = "internal-key"
 STUDENT = "6f1c2a70-0000-4000-8000-000000000001"
-URL = "https://moodle.sdu.edu.kz/webservice/pluginfile.php/123/mod_resource/content/1/лекция 1.pdf?forcedownload=1"
+URL = (
+    "https://moodle.sdu.edu.kz/webservice/pluginfile.php/123/mod_resource"
+    "/content/1/лекция 1.pdf?forcedownload=1"
+)
 
 
 def test_roundtrip_keeps_url():

@@ -5,7 +5,7 @@
 проверка живёт здесь, а не в каждом обработчике (docs/moodle-api-notes.md).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
 
@@ -85,7 +85,7 @@ class MoodleClient:
 
     async def upcoming_events(self, timesortfrom: int | None = None) -> dict:
         if timesortfrom is None:
-            timesortfrom = int(datetime.now(timezone.utc).timestamp())
+            timesortfrom = int(datetime.now(UTC).timestamp())
         return await self.call(
             "core_calendar_get_action_events_by_timesort", timesortfrom=timesortfrom
         )

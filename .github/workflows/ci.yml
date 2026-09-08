@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    name: Тесты и сборка
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Установить зависимости
+        run: pip install -r requirements-dev.txt
+
+      - name: Тесты
+        run: pytest
+
+      - name: Проверка стиля
+        run: ruff check .
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Установить зависимости фронта
+        run: npm --prefix web ci
+
+      - name: Сборка фронта
+        run: npm --prefix web run build
+
+  docker:
+    name: Сборка образов
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Собираем все четыре образа: сломанный Dockerfile должен падать здесь,
+      # а не при попытке поднять сервис.
+      - name: Собрать образы
+        run: |
+          for service in auth moodle tracker gateway; do
+            docker build -f "services/$service/Dockerfile" -t "sduhub-$service:ci" .
+          done

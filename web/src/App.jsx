@@ -40,6 +40,17 @@ export default function App() {
     setTimetable([]);
   };
 
+  /* SECURITY.md требует дать студенту удалить аккаунт и все данные. */
+  const removeAccount = async () => {
+    const sure = window.confirm(
+      "Удалить аккаунт? Токен Moodle, задачи и расписание будут стёрты без возможности вернуть.",
+    );
+    if (!sure) return;
+    await api.deleteAccount().catch(() => {});
+    setMe(null);
+    setTimetable([]);
+  };
+
   if (checking) {
     return <div className="hw"><div className="wrap"><p className="loading">Секунду…</p></div></div>;
   }
@@ -71,6 +82,10 @@ export default function App() {
 
         <div className="danger">
           <button className="linkbtn" onClick={logout}>Выйти ({me.fullname})</button>
+          <br />
+          <button className="linkbtn" style={{ marginTop: 8 }} onClick={removeAccount}>
+            Удалить аккаунт и все данные
+          </button>
         </div>
       </div>
 
