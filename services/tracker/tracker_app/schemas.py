@@ -70,3 +70,11 @@ class ClassIn(BaseModel):
 
 class ClassItem(ClassIn):
     id: UUID
+
+
+class DeadlineImportResult(BaseModel):
+    """Итог импорта дедлайнов из Moodle."""
+
+    added: int
+    updated: int
+    total: int

@@ -137,3 +137,46 @@ class TrackerRepository:
             student_id,
         )
         return result.endswith("1")
+
+    async def upsert_moodle_deadlines(
+        self, student_id: UUID, items: list[dict]
+    ) -> tuple[int, int]:
+        """Импорт дедлайнов. Возвращает (добавлено, обновлено).
+
+        Опирается на частичный уникальный индекс (student_id, moodle_event_id):
+        повторный импорт не плодит дубли, а перенесённый дедлайн обновляет дату.
+        Отметку «сделано» не трогаем — её ставил студент.
+        """
+        added = updated = 0
+        async with self._db.pool.acquire() as conn:
+            async with conn.transaction():
+                for item in items:
+                    if item.get("moodle_event_id") is None:
+                        # Без id события отличить повтор не от чего — пропускаем.
+                        continue
+                    row = await conn.fetchrow(
+                        """
+                        INSERT INTO tasks
+                            (student_id, text, subject, due, kind, source, moodle_event_id)
+                        VALUES ($1, $2, $3, $4, $5, 'moodle', $6)
+                        ON CONFLICT (student_id, moodle_event_id)
+                            WHERE moodle_event_id IS NOT NULL
+                        DO UPDATE SET
+                            text = EXCLUDED.text,
+                            subject = EXCLUDED.subject,
+                            due = EXCLUDED.due,
+                            updated_at = now()
+                        RETURNING (xmax = 0) AS inserted
+                        """,
+                        student_id,
+                        item["text"],
+                        item["subject"],
+                        item["due"],
+                        item["kind"],
+                        item["moodle_event_id"],
+                    )
+                    if row["inserted"]:
+                        added += 1
+                    else:
+                        updated += 1
+        return added, updated

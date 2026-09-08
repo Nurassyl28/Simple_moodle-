@@ -14,10 +14,12 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 from sduhub_common import Database, setup_logging
 from tracker_app.auth_client import AuthClient, AuthUnavailable, SessionInvalid
 from tracker_app.config import TrackerConfig
-from tracker_app.grouping import dedup_key, group_tasks, parse_import
+from tracker_app.grouping import dedup_key, deadline_to_task, group_tasks, parse_import
+from tracker_app.moodle_client import MoodleServiceClient, MoodleServiceError
 from tracker_app.schemas import (
     ClassIn,
     ClassItem,
+    DeadlineImportResult,
     GroupedTasks,
     ImportRequest,
     ImportResult,
@@ -32,6 +34,7 @@ log = setup_logging(cfg.log_level, cfg.service_name)
 db = Database(cfg.dsn)
 repo = TrackerRepository(db)
 auth = AuthClient(cfg.auth_service_url, cfg.internal_api_key)
+moodle = MoodleServiceClient(cfg.moodle_service_url)
 tz = ZoneInfo(cfg.timezone)
 
 
@@ -133,6 +136,27 @@ async def import_tasks(
 
     added = await repo.add_many(student, fresh)
     return ImportResult(added=added, skipped=skipped)
+
+
+@app.post("/tasks/import-deadlines", response_model=DeadlineImportResult)
+async def import_deadlines(x_session_id: str = Header(default="")) -> DeadlineImportResult:
+    """Переносит ближайшие дедлайны Moodle в трекер.
+
+    Повторный вызов безопасен: задачи узнаются по id события, перенесённый
+    дедлайн обновляет дату, а отметка «сделано» остаётся студенту.
+    """
+    student = await current_student(x_session_id)
+    try:
+        events = await moodle.deadlines(x_session_id)
+    except MoodleServiceError as exc:
+        # 401 (токен отозван) доносим как есть, остальное — как недоступность.
+        code = exc.status_code if exc.status_code == status.HTTP_401_UNAUTHORIZED else status.HTTP_502_BAD_GATEWAY
+        raise HTTPException(code, exc.detail)
+
+    items = [task for task in (deadline_to_task(e, tz) for e in events) if task]
+    added, updated = await repo.upsert_moodle_deadlines(student, items)
+    log.info("импорт дедлайнов: добавлено %s, обновлено %s", added, updated)
+    return DeadlineImportResult(added=added, updated=updated, total=len(items))
 
 
 # --- расписание ---

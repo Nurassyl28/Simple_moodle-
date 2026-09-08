@@ -104,3 +104,25 @@ def next_class_for(subject: str, timetable: list[dict], today: date) -> date | N
         if candidate.weekday() in days:
             return candidate
     return None
+
+
+def deadline_to_task(event: dict, tz) -> dict | None:
+    """Событие Moodle → строка задачи.
+
+    `timesort` приходит unix-временем, а дата задачи должна быть в поясе студента:
+    дедлайн в 01:00 по Алматы в UTC ещё вчерашний.
+    """
+    from datetime import datetime, timezone
+
+    timestamp, name = event.get("date"), (event.get("name") or "").strip()
+    if timestamp is None or not name:
+        return None
+
+    due = datetime.fromtimestamp(int(timestamp), timezone.utc).astimezone(tz).date()
+    return {
+        "text": name,
+        "subject": event.get("course") or None,
+        "due": due,
+        "kind": "hw",
+        "moodle_event_id": event.get("event_id"),
+    }

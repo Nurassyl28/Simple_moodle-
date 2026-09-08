@@ -130,3 +130,43 @@ def test_next_class_wraps_to_next_week():
 
 def test_next_class_unknown_subject():
     assert next_class_for("MDE 003", [{"day": 0, "name": "CSS 109"}], TODAY) is None
+
+
+# --- импорт дедлайнов Moodle ---
+
+from zoneinfo import ZoneInfo  # noqa: E402
+
+from tracker_app.grouping import deadline_to_task  # noqa: E402
+
+ALMATY = ZoneInfo("Asia/Almaty")
+
+
+def test_deadline_converted_to_task():
+    event = {"date": 1757000000, "course": "CSS 112", "name": "Сдать лабу 2", "event_id": 42}
+    task = deadline_to_task(event, ALMATY)
+    assert task["text"] == "Сдать лабу 2"
+    assert task["subject"] == "CSS 112"
+    assert task["moodle_event_id"] == 42
+    assert task["kind"] == "hw"
+
+
+def test_deadline_date_uses_student_timezone():
+    """Дедлайн 04:00 по Алматы в UTC ещё вчерашний — дата должна быть местная."""
+    # 2026-09-09 04:00 по Алматы = 2026-09-08 23:00 UTC
+    task = deadline_to_task({"date": 1789081200, "name": "Дедлайн", "event_id": 1}, ALMATY)
+    utc_task = deadline_to_task({"date": 1789081200, "name": "Дедлайн", "event_id": 1}, ZoneInfo("UTC"))
+    assert task["due"] != utc_task["due"]
+    assert task["due"] > utc_task["due"]
+
+
+def test_deadline_without_name_skipped():
+    assert deadline_to_task({"date": 1757000000, "name": "  ", "event_id": 1}, ALMATY) is None
+
+
+def test_deadline_without_date_skipped():
+    assert deadline_to_task({"name": "Без даты", "event_id": 1}, ALMATY) is None
+
+
+def test_deadline_without_course_has_no_subject():
+    task = deadline_to_task({"date": 1757000000, "course": "", "name": "X", "event_id": 1}, ALMATY)
+    assert task["subject"] is None
