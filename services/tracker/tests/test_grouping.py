@@ -2,8 +2,15 @@
 
 from datetime import date
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
-from tracker_app.grouping import dedup_key, group_tasks, next_class_for, parse_import
+from tracker_app.grouping import (
+    deadline_to_task,
+    dedup_key,
+    group_tasks,
+    next_class_for,
+    parse_import,
+)
 from tracker_app.schemas import Task
 
 TODAY = date(2026, 9, 8)  # вторник
@@ -134,9 +141,7 @@ def test_next_class_unknown_subject():
 
 # --- импорт дедлайнов Moodle ---
 
-from zoneinfo import ZoneInfo  # noqa: E402
 
-from tracker_app.grouping import deadline_to_task  # noqa: E402
 
 ALMATY = ZoneInfo("Asia/Almaty")
 
@@ -154,7 +159,9 @@ def test_deadline_date_uses_student_timezone():
     """Дедлайн 04:00 по Алматы в UTC ещё вчерашний — дата должна быть местная."""
     # 2026-09-09 04:00 по Алматы = 2026-09-08 23:00 UTC
     task = deadline_to_task({"date": 1789081200, "name": "Дедлайн", "event_id": 1}, ALMATY)
-    utc_task = deadline_to_task({"date": 1789081200, "name": "Дедлайн", "event_id": 1}, ZoneInfo("UTC"))
+    utc_task = deadline_to_task(
+        {"date": 1789081200, "name": "Дедлайн", "event_id": 1}, ZoneInfo("UTC")
+    )
     assert task["due"] != utc_task["due"]
     assert task["due"] > utc_task["due"]
 
@@ -168,5 +175,7 @@ def test_deadline_without_date_skipped():
 
 
 def test_deadline_without_course_has_no_subject():
-    task = deadline_to_task({"date": 1757000000, "course": "", "name": "X", "event_id": 1}, ALMATY)
+    task = deadline_to_task(
+        {"date": 1757000000, "course": "", "name": "X", "event_id": 1}, ALMATY
+    )
     assert task["subject"] is None

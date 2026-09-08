@@ -45,7 +45,9 @@ async def forward(
         )
     except httpx.HTTPError:
         # Наружу не отдаём ни адрес сервиса, ни текст ошибки httpx.
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "сервис временно недоступен")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "сервис временно недоступен"
+        ) from None
 
     passthrough = {
         k: v for k, v in upstream.headers.items() if k.lower() not in HOP_BY_HOP

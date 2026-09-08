@@ -7,7 +7,13 @@
 pythonpath = ["shared", "services/auth", "services/moodle", "services/tracker", "services/gateway"]
 testpaths = ["shared/tests", "services"]
 addopts = "-q"
+asyncio_mode = "auto"
 
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# B008 — это идиома FastAPI: Depends() в значении по умолчанию, так и задумано.
+ignore = ["B008"]

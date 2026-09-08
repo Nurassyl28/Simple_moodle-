@@ -4,7 +4,6 @@ from datetime import date
 from uuid import UUID
 
 import asyncpg
-
 from sduhub_common import Database
 
 TASK_FIELDS = "id, text, subject, due, kind, done, source"
@@ -148,14 +147,13 @@ class TrackerRepository:
         Отметку «сделано» не трогаем — её ставил студент.
         """
         added = updated = 0
-        async with self._db.pool.acquire() as conn:
-            async with conn.transaction():
-                for item in items:
-                    if item.get("moodle_event_id") is None:
-                        # Без id события отличить повтор не от чего — пропускаем.
-                        continue
-                    row = await conn.fetchrow(
-                        """
+        async with self._db.pool.acquire() as conn, conn.transaction():
+            for item in items:
+                if item.get("moodle_event_id") is None:
+                    # Без id события отличить повтор не от чего — пропускаем.
+                    continue
+                row = await conn.fetchrow(
+                    """
                         INSERT INTO tasks
                             (student_id, text, subject, due, kind, source, moodle_event_id)
                         VALUES ($1, $2, $3, $4, $5, 'moodle', $6)
@@ -168,15 +166,15 @@ class TrackerRepository:
                             updated_at = now()
                         RETURNING (xmax = 0) AS inserted
                         """,
-                        student_id,
-                        item["text"],
-                        item["subject"],
-                        item["due"],
-                        item["kind"],
-                        item["moodle_event_id"],
-                    )
-                    if row["inserted"]:
-                        added += 1
-                    else:
-                        updated += 1
+                    student_id,
+                    item["text"],
+                    item["subject"],
+                    item["due"],
+                    item["kind"],
+                    item["moodle_event_id"],
+                )
+                if row["inserted"]:
+                    added += 1
+                else:
+                    updated += 1
         return added, updated

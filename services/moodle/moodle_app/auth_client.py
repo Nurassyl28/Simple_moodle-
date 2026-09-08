@@ -5,7 +5,6 @@
 """
 
 import httpx
-
 from sduhub_common.internal import INTERNAL_HEADER
 
 TIMEOUT = httpx.Timeout(10.0)

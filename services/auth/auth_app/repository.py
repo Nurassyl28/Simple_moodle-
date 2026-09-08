@@ -1,10 +1,9 @@
 """Работа с БД для auth-service. Токен приходит сюда уже зашифрованным."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import asyncpg
-
 from sduhub_common import Database
 
 
@@ -33,7 +32,7 @@ class AuthRepository:
         return row["id"]
 
     async def create_session(self, student_id: UUID, ttl_hours: int) -> asyncpg.Record:
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl_hours)
+        expires_at = datetime.now(UTC) + timedelta(hours=ttl_hours)
         return await self._db.fetchrow(
             """
             INSERT INTO sessions (student_id, expires_at)

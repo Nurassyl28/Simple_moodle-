@@ -1,5 +1,4 @@
 from pydantic import field_validator
-
 from sduhub_common import BaseConfig
 
 
@@ -12,6 +11,10 @@ class GatewayConfig(BaseConfig):
 
     # Откуда фронту разрешено обращаться. Список через запятую.
     cors_origins: str = "http://localhost:5173"
+
+    # Попытки входа: сколько и за какое окно. Считается и по адресу, и по логину.
+    login_attempts: int = 5
+    login_window_seconds: int = 900
 
     # Cookie с сессией. secure=False только для локальной разработки по http.
     cookie_name: str = "sduhub_session"

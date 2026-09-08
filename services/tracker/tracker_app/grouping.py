@@ -6,7 +6,7 @@
 """
 
 import re
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 
 from tracker_app.schemas import DueGroup, GroupedTasks, Task
 
@@ -112,13 +112,13 @@ def deadline_to_task(event: dict, tz) -> dict | None:
     `timesort` приходит unix-временем, а дата задачи должна быть в поясе студента:
     дедлайн в 01:00 по Алматы в UTC ещё вчерашний.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     timestamp, name = event.get("date"), (event.get("name") or "").strip()
     if timestamp is None or not name:
         return None
 
-    due = datetime.fromtimestamp(int(timestamp), timezone.utc).astimezone(tz).date()
+    due = datetime.fromtimestamp(int(timestamp), UTC).astimezone(tz).date()
     return {
         "text": name,
         "subject": event.get("course") or None,

@@ -6,22 +6,23 @@ gateway не видит вообще: за ним ходит только moodle
 """
 
 import asyncio
+import json
 from contextlib import asynccontextmanager
 
 import httpx
-import json
-
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from sduhub_common import setup_logging
 
 from gateway_app.config import GatewayConfig
 from gateway_app.proxy import TIMEOUT, forward
-from sduhub_common import setup_logging
+from gateway_app.ratelimit import RateLimiter
 
 cfg = GatewayConfig()
 log = setup_logging(cfg.log_level, cfg.service_name)
 
 client: httpx.AsyncClient | None = None
+login_limiter = RateLimiter(cfg.login_attempts, cfg.login_window_seconds)
 
 
 @asynccontextmanager
@@ -53,7 +54,7 @@ def session_of(request: Request) -> str | None:
 def require_session(request: Request) -> str:
     session = session_of(request)
     if not session:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "нужен вход")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "нужен вход") from None
     return session
 
 
@@ -77,11 +78,40 @@ async def health() -> dict:
     return {"service": cfg.service_name, "services": services, "ok": all(services.values())}
 
 
+def _client_ip(request: Request) -> str:
+    """За обратным прокси настоящий адрес приходит в X-Forwarded-For."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @app.post("/api/login")
 async def login(request: Request) -> Response:
     """Логин уходит в auth-service. Сессия возвращается в httpOnly-cookie."""
+    body = await request.body()
+    try:
+        username = (json.loads(body) or {}).get("username", "")
+    except ValueError:
+        username = ""
+
+    # Считаем и по адресу, и по логину: первое ловит перебор паролей с одной
+    # машины, второе — распределённый перебор одной учётной записи.
+    keys = [f"ip:{_client_ip(request)}", f"user:{str(username).lower()[:190]}"]
+    for key in keys:
+        if (retry_after := login_limiter.check(key)) is not None:
+            log.warning("слишком много попыток входа, ключ %s", key.split(":", 1)[0])
+            return Response(
+                content=json.dumps({"detail": "слишком много попыток, попробуй позже"}),
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                media_type="application/json",
+                headers={"Retry-After": str(retry_after)},
+            )
+
     response = await forward(request, cfg.auth_service_url, "/login", None, client)
     if response.status_code == 200:
+        for key in keys:
+            login_limiter.reset(key)
         session_id = json.loads(response.body)["session_id"]
         # httpOnly: скрипт на странице до сессии не дотянется даже при XSS.
         response.set_cookie(
@@ -132,7 +162,7 @@ async def moodle_data(request: Request) -> Response:
     # во внутренний сервис нельзя.
     upstream_path = MOODLE_ROUTES.get(request.url.path.rstrip("/") or request.url.path)
     if upstream_path is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "нет такого пути")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "нет такого пути") from None
     return await forward(request, cfg.moodle_service_url, upstream_path, session, client)
 
 

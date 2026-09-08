@@ -1,7 +1,6 @@
 """Тесты gateway без сети: разбор настроек и фильтрация заголовков."""
 
 import pytest
-
 from gateway_app.config import GatewayConfig
 from gateway_app.proxy import HOP_BY_HOP
 

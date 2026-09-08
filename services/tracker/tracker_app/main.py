@@ -10,12 +10,13 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
-
 from sduhub_common import Database, setup_logging
+
 from tracker_app.auth_client import AuthClient, AuthUnavailable, SessionInvalid
 from tracker_app.config import TrackerConfig
-from tracker_app.grouping import dedup_key, deadline_to_task, group_tasks, parse_import
+from tracker_app.grouping import deadline_to_task, dedup_key, group_tasks, parse_import
 from tracker_app.moodle_client import MoodleServiceClient, MoodleServiceError
+from tracker_app.repository import TrackerRepository
 from tracker_app.schemas import (
     ClassIn,
     ClassItem,
@@ -27,7 +28,6 @@ from tracker_app.schemas import (
     TaskIn,
     TaskPatch,
 )
-from tracker_app.repository import TrackerRepository
 
 cfg = TrackerConfig()
 log = setup_logging(cfg.log_level, cfg.service_name)
@@ -51,13 +51,15 @@ app = FastAPI(title="SDU Hub — tracker-service", lifespan=lifespan)
 
 async def current_student(x_session_id: str = Header(default="")) -> UUID:
     if not x_session_id:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "нужен заголовок X-Session-Id")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "нужен заголовок X-Session-Id") from None
     try:
         return await auth.student_id(x_session_id)
     except SessionInvalid:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "сессия недействительна")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "сессия недействительна") from None
     except AuthUnavailable:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "сервис входа недоступен")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "сервис входа недоступен"
+        ) from None
 
 
 def today_local():
@@ -99,18 +101,18 @@ async def patch_task(
     # exclude_unset: отличаем «не прислали поле» от «прислали null».
     changes = payload.model_dump(exclude_unset=True)
     if not changes:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "нечего менять")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "нечего менять") from None
 
     row = await repo.update_task(student, task_id, changes)
     if row is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "задача не найдена")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "задача не найдена") from None
     return Task(**dict(row))
 
 
 @app.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(task_id: UUID, student: UUID = Depends(current_student)) -> Response:
     if not await repo.delete_task(student, task_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "задача не найдена")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "задача не найдена") from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -150,8 +152,12 @@ async def import_deadlines(x_session_id: str = Header(default="")) -> DeadlineIm
         events = await moodle.deadlines(x_session_id)
     except MoodleServiceError as exc:
         # 401 (токен отозван) доносим как есть, остальное — как недоступность.
-        code = exc.status_code if exc.status_code == status.HTTP_401_UNAUTHORIZED else status.HTTP_502_BAD_GATEWAY
-        raise HTTPException(code, exc.detail)
+        code = (
+            exc.status_code
+            if exc.status_code == status.HTTP_401_UNAUTHORIZED
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        raise HTTPException(code, exc.detail) from None
 
     items = [task for task in (deadline_to_task(e, tz) for e in events) if task]
     added, updated = await repo.upsert_moodle_deadlines(student, items)
@@ -178,5 +184,5 @@ async def add_class(payload: ClassIn, student: UUID = Depends(current_student)) 
 @app.delete("/timetable/{class_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_class(class_id: UUID, student: UUID = Depends(current_student)) -> Response:
     if not await repo.delete_class(student, class_id):
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "пара не найдена")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "пара не найдена") from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)

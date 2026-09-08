@@ -118,15 +118,23 @@ Moodle всё отображается. → Это то, что уже почт�
 
 ```bash
 cp .env.example .env          # заполнить TOKEN_ENCRYPTION_KEY и INTERNAL_API_KEY
-make up                       # postgres + auth + moodle + tracker + gateway
-npm --prefix web install
-npm --prefix web run dev      # http://localhost:5173
+make up                       # весь сервис целиком
 ```
 
-Команды генерации секретов — в `.env.example`. Проверить, что бэкенд жив:
+Открыть http://localhost:5173 — это и есть сервис. Фронт и `/api` отдаются с
+одного адреса, поэтому cookie с сессией работает без настройки CORS.
+
+Команды генерации секретов — в `.env.example`. Проверить бэкенд:
 `curl http://localhost:8000/api/health`.
 
-Тесты: `pytest` из корня.
+Разработка фронта с горячей перезагрузкой:
+
+```bash
+npm --prefix web install
+npm --prefix web run dev      # http://localhost:5173, /api проксируется на gateway
+```
+
+Тесты и стиль: `pytest` и `ruff check .` из корня. То же гоняет CI на каждый PR.
 
 ## Как дать это Claude Code
 

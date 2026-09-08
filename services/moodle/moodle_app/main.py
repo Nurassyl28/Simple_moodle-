@@ -9,8 +9,10 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
+from sduhub_common import FileRefError, make_ref, read_ref, setup_logging
 
 from moodle_app.auth_client import AuthClient, AuthUnavailable, SessionInvalid
+from moodle_app.cache import TTLCache
 from moodle_app.client import (
     ExternalFileRefused,
     InvalidToken,
@@ -21,11 +23,11 @@ from moodle_app.client import (
 from moodle_app.config import MoodleConfig
 from moodle_app.mapping import courses_from, deadlines_from, files_from, grades_from
 from moodle_app.schemas import Deadline, FileItem, Grade, Me
-from sduhub_common import FileRefError, make_ref, read_ref, setup_logging
 
 cfg = MoodleConfig()
 log = setup_logging(cfg.log_level, cfg.service_name)
 auth = AuthClient(cfg.auth_service_url, cfg.internal_api_key)
+cache = TTLCache(cfg.cache_ttl_seconds)
 
 # Сколько курсов опрашиваем одновременно: Moodle не любит шквал запросов,
 # а последовательный обход 8 курсов — это 8 круговых задержек.
@@ -52,22 +54,30 @@ class Student:
 
 async def current_student(x_session_id: str = Header(default="")) -> Student:
     if not x_session_id:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "нужен заголовок X-Session-Id")
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "нужен заголовок X-Session-Id"
+        ) from None
     try:
         token, student_id, userid = await auth.token_for(x_session_id)
     except SessionInvalid:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "сессия недействительна")
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "сессия недействительна") from None
     except AuthUnavailable:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "сервис входа недоступен")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "сервис входа недоступен"
+        ) from None
     return Student(token, student_id, userid)
 
 
 def _moodle_failure(exc: Exception) -> HTTPException:
     """Один перевод ошибок Moodle в ответы наружу — чтобы не расходились."""
     if isinstance(exc, InvalidToken):
-        return HTTPException(status.HTTP_401_UNAUTHORIZED, "требуется повторный вход")
+        return HTTPException(
+            status.HTTP_401_UNAUTHORIZED, "требуется повторный вход"
+        )
     if isinstance(exc, MoodleUnavailable):
-        return HTTPException(status.HTTP_502_BAD_GATEWAY, "Moodle сейчас недоступен")
+        return HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "Moodle сейчас недоступен"
+        )
     code = getattr(exc, "errorcode", "unknown")
     log.warning("Moodle вернул ошибку: %s", code)
     return HTTPException(status.HTTP_502_BAD_GATEWAY, f"Moodle отказал: {code}")
@@ -78,7 +88,7 @@ async def _gather_by_course(student: Student, worker) -> list:
     try:
         courses = courses_from(await student.moodle.courses(student.moodle_userid))
     except (MoodleError, MoodleUnavailable) as exc:
-        raise _moodle_failure(exc)
+        raise _moodle_failure(exc) from None
 
     semaphore = asyncio.Semaphore(COURSE_CONCURRENCY)
 
@@ -106,7 +116,7 @@ async def me(student: Student = Depends(current_student)) -> Me:
         info = await student.moodle.site_info()
         courses = courses_from(await student.moodle.courses(student.moodle_userid))
     except (MoodleError, MoodleUnavailable) as exc:
-        raise _moodle_failure(exc)
+        raise _moodle_failure(exc) from None
 
     return Me(
         fullname=info.get("fullname", ""),
@@ -117,15 +127,23 @@ async def me(student: Student = Depends(current_student)) -> Me:
 
 @app.get("/grades", response_model=list[Grade])
 async def grades(student: Student = Depends(current_student)) -> list[Grade]:
+    if (cached := cache.get((student.student_id, "grades"))) is not None:
+        return cached
+
     async def worker(course):
         raw = await student.moodle.grade_items(course.id, student.moodle_userid)
         return grades_from(course.label or course.shortname, raw)
 
-    return await _gather_by_course(student, worker)
+    result = await _gather_by_course(student, worker)
+    cache.put((student.student_id, "grades"), result)
+    return result
 
 
 @app.get("/files", response_model=list[FileItem])
 async def files(student: Student = Depends(current_student)) -> list[FileItem]:
+    if (cached := cache.get((student.student_id, "files"))) is not None:
+        return cached
+
     async def worker(course):
         contents = await student.moodle.course_contents(course.id)
         return files_from(course.label or course.shortname, contents, cfg.moodle_site)
@@ -164,6 +182,8 @@ async def files(student: Student = Depends(current_student)) -> list[FileItem]:
                 ),
             )
         )
+
+    cache.put((student.student_id, "files"), result)
     return result
 
 
@@ -178,7 +198,7 @@ async def download(
     except FileRefError as exc:
         # Не уточняем, что именно не так: подпись, владелец или срок.
         log.info("отклонена ссылка на файл: %s", exc)
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "ссылка недействительна")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "ссылка недействительна") from None
 
     try:
         upstream = await student.moodle.download(file_url)
@@ -188,9 +208,9 @@ async def download(
         log.warning("отказ качать внешнюю ссылку через прокси")
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, "внешняя ссылка открывается напрямую"
-        )
+        ) from None
     except (MoodleError, MoodleUnavailable) as exc:
-        raise _moodle_failure(exc)
+        raise _moodle_failure(exc) from None
 
     headers = {}
     disposition = upstream.headers.get("content-disposition")
@@ -209,6 +229,6 @@ async def deadlines(student: Student = Depends(current_student)) -> list[Deadlin
     try:
         raw = await student.moodle.upcoming_events()
     except (MoodleError, MoodleUnavailable) as exc:
-        raise _moodle_failure(exc)
+        raise _moodle_failure(exc) from None
     # Пусто в начале семестра — это норма, а не ошибка (README).
     return deadlines_from(raw)

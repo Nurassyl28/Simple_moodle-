@@ -1,8 +1,14 @@
 """Тесты разбора ответов Moodle. Сети здесь нет — только чистые функции."""
 
 import pytest
-
-from moodle_app.mapping import courses_from, deadlines_from, files_from, grades_from
+from moodle_app.client import ExternalFileRefused, MoodleClient
+from moodle_app.mapping import (
+    course_label,
+    courses_from,
+    deadlines_from,
+    files_from,
+    grades_from,
+)
 
 
 def test_courses_basic():
@@ -75,11 +81,11 @@ def test_files_handles_missing_keys():
 
 def test_deadlines_sorted_and_mapped():
     raw = {"events": [
-        {"id": 22, "name": "Сдать лабу 2", "timesort": 1760000000, "course": {"shortname": "CSS 112"}},
-        {"id": 11, "name": "Сдать лабу 1", "timesort": 1750000000, "course": {"shortname": "CSS 109"}},
+        {"id": 22, "name": "Лаба 2", "timesort": 1760000000, "course": {"shortname": "CSS 112"}},
+        {"id": 11, "name": "Лаба 1", "timesort": 1750000000, "course": {"shortname": "CSS 109"}},
     ]}
     first, second = deadlines_from(raw)
-    assert first.name == "Сдать лабу 1"
+    assert first.name == "Лаба 1"
     assert second.date > first.date
     assert first.event_id == 11
 
@@ -100,15 +106,14 @@ def test_deadline_without_timesort_skipped():
 
 # --- находки живого запуска ---
 
-from moodle_app.client import ExternalFileRefused, MoodleClient  # noqa: E402
-from moodle_app.mapping import course_label  # noqa: E402
 
 SITE = "https://moodle.sdu.edu.kz"
 
 
 def test_course_label_extracts_code():
     """Живой курс: «MAT 156 Discrete Mathematics (Akniyet Mussakhan)»."""
-    assert course_label("MAT 156 Discrete Mathematics (Akniyet Mussakhan)", "mat156-12418") == "MAT 156"
+    label = course_label("MAT 156 Discrete Mathematics (Akniyet Mussakhan)", "mat156-12418")
+    assert label == "MAT 156"
 
 
 def test_course_label_without_space():
@@ -124,7 +129,9 @@ def test_course_label_falls_back_to_shortname():
 
 
 def test_courses_get_label():
-    (course,) = courses_from([{"id": 1, "fullname": "MDE 003 General English (B1 level)", "shortname": "mde003-11096"}])
+    (course,) = courses_from(
+        [{"id": 1, "fullname": "MDE 003 General English (B1 level)", "shortname": "mde003-11096"}]
+    )
     assert course.label == "MDE 003"
 
 
