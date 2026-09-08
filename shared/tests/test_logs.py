@@ -37,3 +37,12 @@ def test_logger_masks_message(caplog):
     with caplog.at_level(logging.INFO):
         log.info("токен %s получен", TOKEN)
     assert TOKEN not in caplog.text
+
+
+def test_uvicorn_logs_not_duplicated():
+    """Без propagate=False каждая строка uvicorn писалась бы дважды."""
+    setup_logging("INFO", "test")
+    for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        logger = logging.getLogger(name)
+        assert logger.propagate is False
+        assert len(logger.handlers) == 1
