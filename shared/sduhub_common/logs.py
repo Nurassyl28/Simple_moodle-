@@ -42,7 +42,11 @@ def setup_logging(level: str = "INFO", service: str = "sduhub") -> logging.Logge
     root.handlers = [handler]
     root.setLevel(level.upper())
     # uvicorn пишет пути запросов — там тоже может оказаться токен.
+    # propagate=False обязателен: иначе запись уйдёт и в свой handler, и в корневой,
+    # и каждая строка лога задвоится.
     for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
-        logging.getLogger(name).handlers = [handler]
+        logger = logging.getLogger(name)
+        logger.handlers = [handler]
+        logger.propagate = False
 
     return logging.getLogger(service)

@@ -9,9 +9,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     # Порт наружу — только для локальной отладки через psql.
+    # Внутри docker-сети всегда 5432; наружу пробрасываем POSTGRES_HOST_PORT,
+    # чтобы не спорить с локально установленным Postgres.
     # На проде эту секцию убрать: сервисы ходят внутри docker-сети.
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       # Скрипты отсюда выполняются один раз, при создании пустого тома.
