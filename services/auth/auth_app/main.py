@@ -10,15 +10,15 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
 
-from app.config import AuthConfig
-from app.moodle_login import (
+from auth_app.config import AuthConfig
+from auth_app.moodle_login import (
     MoodleAuthError,
     MoodleUnavailable,
     exchange_password_for_token,
     fetch_site_info,
 )
-from app.repository import AuthRepository
-from app.schemas import LoginRequest, LoginResponse, SessionInfo, TokenInfo
+from auth_app.repository import AuthRepository
+from auth_app.schemas import LoginRequest, LoginResponse, SessionInfo, TokenInfo
 from sduhub_common import Database, TokenCipher, require_internal_key, setup_logging
 
 cfg = AuthConfig()
