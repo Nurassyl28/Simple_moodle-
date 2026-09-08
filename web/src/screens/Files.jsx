@@ -30,8 +30,14 @@ export default function Files() {
           <div className="card">
             {items.map((file, i) => (
               <div className="line" key={i}>
-                <a href={file.download_url} target="_blank" rel="noreferrer">{file.name}</a>
-                {file.section && <span className="c">{file.section}</span>}
+                {/* Внешняя ссылка открывается напрямую: через наш прокси её
+                    качать нельзя, он подставляет токен Moodle. */}
+                <a href={file.download_url || file.external_url} target="_blank" rel="noreferrer">
+                  {file.name}
+                </a>
+                <span className="c">
+                  {file.external_url ? "внешняя ссылка" : file.section}
+                </span>
               </div>
             ))}
           </div>

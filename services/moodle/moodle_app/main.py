@@ -11,7 +11,13 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, status
 
 from moodle_app.auth_client import AuthClient, AuthUnavailable, SessionInvalid
-from moodle_app.client import InvalidToken, MoodleClient, MoodleError, MoodleUnavailable
+from moodle_app.client import (
+    ExternalFileRefused,
+    InvalidToken,
+    MoodleClient,
+    MoodleError,
+    MoodleUnavailable,
+)
 from moodle_app.config import MoodleConfig
 from moodle_app.mapping import courses_from, deadlines_from, files_from, grades_from
 from moodle_app.schemas import Deadline, FileItem, Grade, Me
@@ -113,7 +119,7 @@ async def me(student: Student = Depends(current_student)) -> Me:
 async def grades(student: Student = Depends(current_student)) -> list[Grade]:
     async def worker(course):
         raw = await student.moodle.grade_items(course.id, student.moodle_userid)
-        return grades_from(course.shortname or course.fullname, raw)
+        return grades_from(course.label or course.shortname, raw)
 
     return await _gather_by_course(student, worker)
 
@@ -122,26 +128,43 @@ async def grades(student: Student = Depends(current_student)) -> list[Grade]:
 async def files(student: Student = Depends(current_student)) -> list[FileItem]:
     async def worker(course):
         contents = await student.moodle.course_contents(course.id)
-        return files_from(course.shortname or course.fullname, contents)
+        return files_from(course.label or course.shortname, contents, cfg.moodle_site)
 
     raw_files = await _gather_by_course(student, worker)
-    return [
-        FileItem(
-            course=item["course"],
-            section=item["section"],
-            name=item["name"],
-            mimetype=item["mimetype"],
-            modified=item["modified"],
-            download_url="/api/files/download?ref="
-            + make_ref(
-                cfg.internal_api_key,
-                student.student_id,
-                item["fileurl"],
-                ttl=cfg.file_ref_ttl_seconds,
-            ),
+
+    result = []
+    for item in raw_files:
+        if item["external"]:
+            # Ссылка на сторонний сайт: отдаём как есть, без подписи и без токена.
+            result.append(
+                FileItem(
+                    course=item["course"],
+                    section=item["section"],
+                    name=item["name"],
+                    mimetype=item["mimetype"],
+                    modified=item["modified"],
+                    external_url=item["fileurl"],
+                )
+            )
+            continue
+
+        result.append(
+            FileItem(
+                course=item["course"],
+                section=item["section"],
+                name=item["name"],
+                mimetype=item["mimetype"],
+                modified=item["modified"],
+                download_url="/api/files/download?ref="
+                + make_ref(
+                    cfg.internal_api_key,
+                    student.student_id,
+                    item["fileurl"],
+                    ttl=cfg.file_ref_ttl_seconds,
+                ),
+            )
         )
-        for item in raw_files
-    ]
+    return result
 
 
 @app.get("/files/download")
@@ -159,6 +182,13 @@ async def download(
 
     try:
         upstream = await student.moodle.download(file_url)
+    except ExternalFileRefused:
+        # Подписанная ссылка на чужой домен могла остаться от старой версии.
+        # Токен туда не уходит ни при каких обстоятельствах.
+        log.warning("отказ качать внешнюю ссылку через прокси")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "внешняя ссылка открывается напрямую"
+        )
     except (MoodleError, MoodleUnavailable) as exc:
         raise _moodle_failure(exc)
 

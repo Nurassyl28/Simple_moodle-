@@ -7,6 +7,7 @@
 
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -29,6 +30,10 @@ class MoodleUnavailable(Exception):
 
 class InvalidToken(MoodleError):
     """Токен сброшен или отозван — студенту нужен повторный вход."""
+
+
+class ExternalFileRefused(Exception):
+    """Ссылка ведёт не в Moodle. Токен туда отправлять нельзя."""
 
 
 class MoodleClient:
@@ -85,8 +90,18 @@ class MoodleClient:
             "core_calendar_get_action_events_by_timesort", timesortfrom=timesortfrom
         )
 
+    def is_moodle_url(self, url: str) -> bool:
+        """Тот ли это хост, которому вообще можно показывать токен."""
+        return urlparse(url).netloc.lower() == urlparse(self._site).netloc.lower()
+
     async def download(self, file_url: str) -> httpx.Response:
         """Скачивает файл Moodle, подставляя токен на своей стороне."""
+        # Преподаватели вставляют в курс ссылки на сторонние сайты (canva.link и
+        # подобные). Дописать к ним токен — значит отдать доступ к оценкам
+        # чужому сервису. Проверка стоит здесь, у самого места подстановки.
+        if not self.is_moodle_url(file_url):
+            raise ExternalFileRefused(file_url)
+
         separator = "&" if "?" in file_url else "?"
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT, follow_redirects=True) as client:
