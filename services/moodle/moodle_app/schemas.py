@@ -5,6 +5,8 @@ class Course(BaseModel):
     id: int
     fullname: str
     shortname: str
+    # Короткое имя для экрана: «MAT 156».
+    label: str = ""
 
 
 class Me(BaseModel):
@@ -28,7 +30,11 @@ class FileItem(BaseModel):
     mimetype: str | None = None
     modified: int | None = None
     # Подписанная ссылка на свой же бэкенд. Токена Moodle в ней нет.
-    download_url: str
+    # Пусто у внешних ссылок — их мы не проксируем.
+    download_url: str | None = None
+    # Ссылка на сторонний сайт, вставленная преподавателем. Открывается как есть,
+    # без токена: отдавать токен чужому домену нельзя.
+    external_url: str | None = None
 
 
 class Deadline(BaseModel):

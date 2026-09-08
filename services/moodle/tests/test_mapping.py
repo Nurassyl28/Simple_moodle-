@@ -1,5 +1,7 @@
 """Тесты разбора ответов Moodle. Сети здесь нет — только чистые функции."""
 
+import pytest
+
 from moodle_app.mapping import courses_from, deadlines_from, files_from, grades_from
 
 
@@ -94,3 +96,65 @@ def test_deadline_without_course_does_not_crash():
 
 def test_deadline_without_timesort_skipped():
     assert deadlines_from({"events": [{"id": 1, "name": "Без даты"}]}) == []
+
+
+# --- находки живого запуска ---
+
+from moodle_app.client import ExternalFileRefused, MoodleClient  # noqa: E402
+from moodle_app.mapping import course_label  # noqa: E402
+
+SITE = "https://moodle.sdu.edu.kz"
+
+
+def test_course_label_extracts_code():
+    """Живой курс: «MAT 156 Discrete Mathematics (Akniyet Mussakhan)»."""
+    assert course_label("MAT 156 Discrete Mathematics (Akniyet Mussakhan)", "mat156-12418") == "MAT 156"
+
+
+def test_course_label_without_space():
+    assert course_label("CSS109 Programming", "x") == "CSS 109"
+
+
+def test_course_label_falls_back_to_fullname():
+    assert course_label("Военная кафедра", "vk-2026") == "Военная кафедра"
+
+
+def test_course_label_falls_back_to_shortname():
+    assert course_label("", "mde003-11096") == "mde003-11096"
+
+
+def test_courses_get_label():
+    (course,) = courses_from([{"id": 1, "fullname": "MDE 003 General English (B1 level)", "shortname": "mde003-11096"}])
+    assert course.label == "MDE 003"
+
+
+def test_external_file_marked():
+    """Преподаватель вставил ссылку на canva.link — токен туда отправлять нельзя."""
+    contents = [{"name": "Тема 1", "modules": [{"name": "Unit 1 ppt", "contents": [
+        {"filename": "Unit 1 ppt", "fileurl": "https://canva.link/d54flvbd"},
+    ]}]}]
+    (item,) = files_from("MDE 003", contents, SITE)
+    assert item["external"] is True
+
+
+def test_moodle_file_not_marked_external():
+    contents = [{"name": "Тема 1", "modules": [{"name": "Лекция", "contents": [
+        {"filename": "l.pdf", "fileurl": "https://moodle.sdu.edu.kz/webservice/pluginfile.php/1/l.pdf"},
+    ]}]}]
+    (item,) = files_from("MAT 156", contents, SITE)
+    assert item["external"] is False
+
+
+def test_client_refuses_external_download():
+    """Главная защита: токен не подставляется к чужому хосту."""
+    import asyncio
+
+    client = MoodleClient(SITE, "a1b2c3d4e5f60718293a4b5c6d7e8f90")
+    with pytest.raises(ExternalFileRefused):
+        asyncio.run(client.download("https://canva.link/no1j8tql"))
+
+
+def test_client_recognises_own_host():
+    client = MoodleClient(SITE, "token")
+    assert client.is_moodle_url("https://moodle.sdu.edu.kz/webservice/pluginfile.php/1/x.pdf")
+    assert not client.is_moodle_url("https://moodle.sdu.edu.kz.evil.com/x.pdf")
