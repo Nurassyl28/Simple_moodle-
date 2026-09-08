@@ -145,6 +145,15 @@ async def tasks(request: Request, rest: str = "") -> Response:
     return await forward(request, cfg.tracker_service_url, f"/tasks{rest}", session, client)
 
 
+@app.post("/api/deadlines/import", response_model=None)
+async def import_deadlines(request: Request) -> Response:
+    """Дедлайны Moodle → задачи трекера. Живёт в трекере, туда и уходит."""
+    session = require_session(request)
+    return await forward(
+        request, cfg.tracker_service_url, "/tasks/import-deadlines", session, client
+    )
+
+
 @app.api_route("/api/timetable{rest:path}", methods=["GET", "POST", "DELETE"])
 async def timetable(request: Request, rest: str = "") -> Response:
     session = require_session(request)
