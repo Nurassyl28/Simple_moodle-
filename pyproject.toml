@@ -4,7 +4,7 @@
 # Чтобы тесты видели общий пакет и код сервисов без установки: pytest из корня.
 # Пакеты сервисов названы по-разному (auth_app, moodle_app) — иначе одинаковый
 # "app" в нескольких сервисах давал бы коллизию при импорте в тестах.
-pythonpath = ["shared", "services/auth", "services/moodle", "services/tracker"]
+pythonpath = ["shared", "services/auth", "services/moodle", "services/tracker", "services/gateway"]
 testpaths = ["shared/tests", "services"]
 addopts = "-q"
 

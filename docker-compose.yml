@@ -71,5 +71,27 @@ services:
       timeout: 5s
       retries: 5
 
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    # Единственный сервис, опубликованный наружу.
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      auth:
+        condition: service_healthy
+      moodle:
+        condition: service_healthy
+      tracker:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/api/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:
