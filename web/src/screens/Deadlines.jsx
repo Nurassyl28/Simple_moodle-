@@ -2,22 +2,30 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { prettyStamp } from "../dates";
 
-/** Ближайшие дедлайны прямо из Moodle, без записи в трекер. */
+/** Ближайшие дедлайны прямо из Moodle, с переносом в личный трекер. */
 export default function Deadlines() {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
-  const [imported, setImported] = useState("");
+  const [result, setResult] = useState("");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.deadlines().then(setRows).catch(() => setError("Moodle не отдал дедлайны"));
   }, []);
 
   const importAll = async () => {
+    setBusy(true);
     try {
       const res = await api.importDeadlines();
-      setImported(`Добавлено ${res.added}, обновлено ${res.updated}`);
+      setResult(
+        res.added || res.updated
+          ? `Перенесено: ${res.added} новых, ${res.updated} обновлено`
+          : "Всё уже в трекере",
+      );
     } catch {
-      setImported("Не получилось перенести");
+      setResult("Не получилось перенести");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -44,8 +52,10 @@ export default function Deadlines() {
           </div>
         ))}
       </div>
-      <button className="save" onClick={importAll}>Перенести в мой трекер</button>
-      {imported && <div className="result">{imported}</div>}
+      <button className="save" disabled={busy} onClick={importAll}>
+        {busy ? "Переношу…" : "Перенести в мой трекер"}
+      </button>
+      {result && <div className="result">{result}</div>}
     </>
   );
 }

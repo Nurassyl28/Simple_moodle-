@@ -8,7 +8,7 @@ import { addDays, iso, pretty } from "../dates";
  * Подсказка «следующая пара по предмету» перенесена из трекера: чаще всего
  * домашку задают к следующей паре, и это избавляет от возни с календарём.
  */
-export default function AddSheet({ initial, subjects, timetable, onClose, onSave }) {
+export default function AddSheet({ initial, subjects, timetable, onClose, onSave, onImport }) {
   const [text, setText] = useState(initial?.text || "");
   const [subject, setSubject] = useState(initial?.subject || "");
   const [due, setDue] = useState(initial?.due || "");
@@ -102,6 +102,18 @@ export default function AddSheet({ initial, subjects, timetable, onClose, onSave
         <button className="save" disabled={!text.trim()} onClick={submit}>
           Сохранить
         </button>
+
+        {/* Вставка списком — это тоже добавление задач, поэтому вход в неё
+            здесь, а не отдельной кнопкой в шапке экрана. */}
+        {!initial?.id && onImport && (
+          <button
+            className="linkbtn"
+            style={{ display: "block", margin: "14px auto 0" }}
+            onClick={onImport}
+          >
+            или вставить сразу списком
+          </button>
+        )}
       </div>
     </div>
   );
