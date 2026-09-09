@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { MapPin, Plus, Trash2, X } from "lucide-react";
+import { ImagePlus, MapPin, Plus, Trash2, X } from "lucide-react";
 import { api } from "../api";
 import { DAYS_RU } from "../dates";
+import ScheduleImportSheet from "../components/ScheduleImportSheet";
 
 const EMPTY = { name: "", time: "", room: "" };
 
@@ -14,6 +15,7 @@ const EMPTY = { name: "", time: "", room: "" };
  */
 export default function Timetable({ items, reload }) {
   const [openDay, setOpenDay] = useState(null);
+  const [importing, setImporting] = useState(false);
   const [draft, setDraft] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
 
@@ -47,6 +49,16 @@ export default function Timetable({ items, reload }) {
 
   return (
     <>
+      {/* Заполнять расписание руками — семь дней и десяток пар. Вставка
+          таблицы из портала делает это за один шаг. */}
+      <button
+        className="daybtn"
+        style={{ marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}
+        onClick={() => setImporting(true)}
+      >
+        <ImagePlus size={15} /> Заполнить из портала СДУ
+      </button>
+
       {DAYS_RU.map((label, day) => {
         const classes = items.filter((c) => c.day === day);
         return (
@@ -107,6 +119,10 @@ export default function Timetable({ items, reload }) {
           </div>
         );
       })}
+
+      {importing && (
+        <ScheduleImportSheet onClose={() => setImporting(false)} onDone={reload} />
+      )}
     </>
   );
 }

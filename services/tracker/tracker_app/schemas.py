@@ -78,3 +78,24 @@ class DeadlineImportResult(BaseModel):
     added: int
     updated: int
     total: int
+
+
+class ParsedClassOut(ClassIn):
+    """Занятие, распознанное с картинки. Ещё не сохранено — сначала показываем."""
+
+
+class ScheduleParseResult(BaseModel):
+    classes: list[ParsedClassOut]
+
+
+class TimetableBulk(BaseModel):
+    classes: list[ClassIn] = Field(max_length=100)
+    # Расписание чаще заменяют целиком, чем дополняют: новый семестр — новая
+    # таблица. Но затирать чужие правки молча нельзя, поэтому это выбор студента.
+    replace: bool = False
+
+
+class HtmlImportRequest(BaseModel):
+    """Разметка таблицы, скопированной со страницы расписания портала."""
+
+    html: str = Field(min_length=1, max_length=2_000_000)
