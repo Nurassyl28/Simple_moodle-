@@ -61,9 +61,12 @@ export const colorFor = (name) => {
   return PALETTE[h % PALETTE.length];
 };
 
-/* Unix-время из Moodle → человеческая строка. */
+/* Unix-время из Moodle → человеческая строка.
+   Полночь не показываем: «00:00» значит, что время просто не задано. */
 export const prettyStamp = (unix) => {
   const d = new Date(unix * 1000);
+  const date = `${SHORT_RU[dayIndex(d)]}, ${d.getDate()} ${MONTHS_RU[d.getMonth()]}`;
+  if (d.getHours() === 0 && d.getMinutes() === 0) return date;
   const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `${SHORT_RU[dayIndex(d)]}, ${d.getDate()} ${MONTHS_RU[d.getMonth()]}, ${time}`;
+  return `${date}, ${time}`;
 };

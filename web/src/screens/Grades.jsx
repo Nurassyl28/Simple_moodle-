@@ -26,18 +26,28 @@ export default function Grades() {
     return acc;
   }, {});
 
+  /* Если по курсу ничего не выставлено, писать «нет оценки» у каждой строки —
+     шум. Достаточно сказать это один раз про весь курс. */
+  const nothingYet = (items) => items.every((row) => row.grade === "-");
+
   return (
     <>
       {Object.entries(byCourse).map(([course, items]) => (
         <div className="sect" key={course}>
-          <div className="sect-head small"><h2>{course}</h2></div>
+          <div className="sect-head small">
+            <h2>{course}</h2>
+            {nothingYet(items) && <span className="when">оценок ещё нет</span>}
+          </div>
           <div className="card">
             {items.map((row, i) => (
               <div className={`line${row.is_total ? " total" : ""}`} key={i}>
                 <span>{row.item || "Без названия"}</span>
                 <span className={`g${row.grade === "-" ? " none" : ""}`}>
-                  {row.grade === "-" ? "нет оценки" : row.grade}
-                  {row.range && row.grade !== "-" && ` / ${row.range.split("–")[1]}`}
+                  {row.grade === "-"
+                    ? "—"
+                    : row.range
+                      ? `${row.grade} / ${row.range.split("–")[1]}`
+                      : row.grade}
                 </span>
               </div>
             ))}

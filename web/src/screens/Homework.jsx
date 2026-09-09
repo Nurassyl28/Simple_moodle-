@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, DownloadCloud, Plus, Undo2 } from "lucide-react";
+import { AlertCircle, Plus, Undo2 } from "lucide-react";
 import { api } from "../api";
-import { DAYS_RU, MONTHS_RU, dayIndex, pretty } from "../dates";
+import { pretty } from "../dates";
 import AddSheet from "../components/AddSheet";
 import ImportSheet from "../components/ImportSheet";
 import TaskRow from "../components/TaskRow";
@@ -13,7 +13,7 @@ import TaskRow from "../components/TaskRow";
  * часовой пояс студента, и одна и та же логика не расходится между клиентами.
  * Экран только показывает готовые корзины.
  */
-export default function Homework({ timetable, onNeedTimetable }) {
+export default function Homework({ timetable, onSummary, onNeedTimetable }) {
   const [groups, setGroups] = useState(null);
   const [error, setError] = useState("");
   const [sheet, setSheet] = useState(null);
@@ -23,7 +23,14 @@ export default function Homework({ timetable, onNeedTimetable }) {
 
   const load = async () => {
     try {
-      setGroups(await api.grouped());
+      const data = await api.grouped();
+      setGroups(data);
+      // Счётчики живут в общей шапке приложения, а данные приходят сюда.
+      onSummary?.({
+        today: data.due_today.length,
+        tomorrow: data.due_tomorrow.length,
+        overdue: data.overdue.length,
+      });
       setError("");
     } catch {
       setError("Не получилось загрузить задачи");
@@ -71,19 +78,8 @@ export default function Homework({ timetable, onNeedTimetable }) {
     load();
   };
 
-  const importDeadlines = async () => {
-    try {
-      const res = await api.importDeadlines();
-      setError(res.added || res.updated ? "" : "Новых дедлайнов в Moodle нет");
-      load();
-    } catch {
-      setError("Moodle не отдал дедлайны");
-    }
-  };
-
   if (!groups) return <p className="loading">Открываю тетрадь…</p>;
 
-  const now = new Date();
   const subjects = [
     ...new Set([
       ...timetable.map((c) => c.name),
@@ -101,26 +97,6 @@ export default function Homework({ timetable, onNeedTimetable }) {
 
   return (
     <>
-      <div className="top">
-        <div>
-          <h1>{DAYS_RU[dayIndex(now)]}, {now.getDate()} {MONTHS_RU[now.getMonth()]}</h1>
-          <div className="count">
-            сегодня <b>{groups.due_today.length}</b> · завтра <b>{groups.due_tomorrow.length}</b>
-            {groups.overdue.length > 0 && (
-              <> · <b style={{ color: "#C0392B" }}>просрочено {groups.overdue.length}</b></>
-            )}
-          </div>
-        </div>
-        <div className="tools">
-          <button className="tool" onClick={importDeadlines} title="Забрать дедлайны из Moodle">
-            <DownloadCloud size={16} />
-          </button>
-          <button className="tool" onClick={() => setSheet("import")} title="Импорт списком">
-            <Plus size={16} />
-          </button>
-        </div>
-      </div>
-
       {error && <div className="banner"><AlertCircle size={15} /> {error}</div>}
 
       <Section title="Просрочено" items={groups.overdue} showDate {...rowProps} />
@@ -158,7 +134,8 @@ export default function Homework({ timetable, onNeedTimetable }) {
 
       {isEmpty(groups) && (
         <div className="empty">
-          Пусто. Нажми <b>+</b>, чтобы записать домашку, или забери дедлайны из Moodle.
+          Пока ничего не записано.<br />
+          Нажми <b>+</b> внизу справа или перенеси дедлайны на вкладке «Дедлайны».
         </div>
       )}
 
@@ -180,14 +157,15 @@ export default function Homework({ timetable, onNeedTimetable }) {
           timetable={timetable}
           onClose={() => { setSheet(null); setEditing(null); }}
           onSave={save}
+          onImport={() => { setEditing(null); setSheet("import"); }}
         />
       )}
       {sheet === "import" && (
         <ImportSheet onClose={() => setSheet(null)} onDone={load} />
       )}
       {subjects.length === 0 && onNeedTimetable && (
-        <button className="linkbtn" style={{ marginTop: 20 }} onClick={onNeedTimetable}>
-          Заполнить расписание — тогда появятся предметы и подсказки по датам
+        <button className="linkbtn" style={{ marginTop: 24 }} onClick={onNeedTimetable}>
+          Заполнить расписание — появятся предметы и подсказка «к паре»
         </button>
       )}
     </>

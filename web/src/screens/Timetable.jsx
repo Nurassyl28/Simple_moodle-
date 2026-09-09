@@ -1,11 +1,20 @@
 import { useState } from "react";
-import { MapPin, Trash2 } from "lucide-react";
+import { MapPin, Plus, Trash2, X } from "lucide-react";
 import { api } from "../api";
 import { DAYS_RU } from "../dates";
 
-/** Расписание пар. День недели считается от понедельника, как в СДУ. */
+const EMPTY = { name: "", time: "", room: "" };
+
+/**
+ * Расписание пар. День недели считается от понедельника, как в СДУ.
+ *
+ * Раньше форма добавления была раскрыта под каждым из семи дней сразу — экран
+ * выглядел стеной одинаковых полей. Теперь форма открывается по кнопке того дня,
+ * куда добавляют.
+ */
 export default function Timetable({ items, reload }) {
-  const [draft, setDraft] = useState({ day: 0, name: "", time: "", room: "" });
+  const [openDay, setOpenDay] = useState(null);
+  const [draft, setDraft] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
 
   const add = async (day) => {
@@ -18,7 +27,8 @@ export default function Timetable({ items, reload }) {
         time: draft.time,
         room: draft.room.trim() || null,
       });
-      setDraft({ day, name: "", time: "", room: "" });
+      setDraft(EMPTY);
+      setOpenDay(null);
       reload();
     } finally {
       setBusy(false);
@@ -28,6 +38,11 @@ export default function Timetable({ items, reload }) {
   const remove = async (id) => {
     await api.deleteClass(id);
     reload();
+  };
+
+  const open = (day) => {
+    setOpenDay(day);
+    setDraft(EMPTY);
   };
 
   return (
@@ -52,27 +67,43 @@ export default function Timetable({ items, reload }) {
               </div>
             ))}
 
-            <div className="tt-form">
-              <input
-                placeholder="Предмет"
-                value={draft.day === day ? draft.name : ""}
-                onChange={(e) => setDraft({ ...draft, day, name: e.target.value })}
-                style={{ flex: 2 }}
-              />
-              <input
-                type="time"
-                value={draft.day === day ? draft.time : ""}
-                onChange={(e) => setDraft({ ...draft, day, time: e.target.value })}
-                style={{ flex: 1 }}
-              />
-              <input
-                placeholder="Ауд."
-                value={draft.day === day ? draft.room : ""}
-                onChange={(e) => setDraft({ ...draft, day, room: e.target.value })}
-                style={{ width: 70 }}
-              />
-              <button className="chip" disabled={busy} onClick={() => add(day)}>+</button>
-            </div>
+            {openDay === day ? (
+              <div className="tt-form">
+                <input
+                  placeholder="Предмет"
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                  style={{ flex: 2 }}
+                  autoFocus
+                />
+                <input
+                  type="time"
+                  value={draft.time}
+                  onChange={(e) => setDraft({ ...draft, time: e.target.value })}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  placeholder="Ауд."
+                  value={draft.room}
+                  onChange={(e) => setDraft({ ...draft, room: e.target.value })}
+                  style={{ width: 66 }}
+                />
+                <button
+                  className="chip on"
+                  disabled={busy || !draft.name.trim() || !draft.time}
+                  onClick={() => add(day)}
+                >
+                  <Plus size={14} />
+                </button>
+                <button className="tool" onClick={() => setOpenDay(null)} aria-label="Отменить">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button className="daybtn" onClick={() => open(day)}>
+                + добавить пару
+              </button>
+            )}
           </div>
         );
       })}

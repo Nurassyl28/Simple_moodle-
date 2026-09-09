@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { api } from "../api";
 
 /**
  * Файлы курсов. Ссылка ведёт на наш бэкенд, а не в Moodle: токен подставляется
- * на сервере, в адресе его нет.
+ * на сервере, в адресе его нет. Внешние ссылки открываются напрямую — им токен
+ * не показываем.
  */
 export default function Files() {
   const [rows, setRows] = useState(null);
@@ -15,7 +17,9 @@ export default function Files() {
 
   if (error) return <div className="empty">{error}</div>;
   if (!rows) return <p className="loading">Собираю файлы…</p>;
-  if (!rows.length) return <div className="empty">Файлов пока нет.</div>;
+  if (!rows.length) {
+    return <div className="empty">Файлов пока нет — курсы ещё не наполнили.</div>;
+  }
 
   const byCourse = rows.reduce((acc, row) => {
     (acc[row.course] ||= []).push(row);
@@ -30,14 +34,21 @@ export default function Files() {
           <div className="card">
             {items.map((file, i) => (
               <div className="line" key={i}>
-                {/* Внешняя ссылка открывается напрямую: через наш прокси её
-                    качать нельзя, он подставляет токен Moodle. */}
-                <a href={file.download_url || file.external_url} target="_blank" rel="noreferrer">
+                <a
+                  className="fname"
+                  href={file.download_url || file.external_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={file.name}
+                >
                   {file.name}
                 </a>
-                <span className="c">
-                  {file.external_url ? "внешняя ссылка" : file.section}
-                </span>
+                {/* Раньше справа висело имя секции Moodle («General») — оно
+                    по-английски и студенту ничего не говорит. Осталось только
+                    то, что меняет поведение ссылки. */}
+                {file.external_url && (
+                  <span className="pill"><ExternalLink size={11} /> внешняя</span>
+                )}
               </div>
             ))}
           </div>
