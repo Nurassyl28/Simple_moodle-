@@ -178,3 +178,30 @@ class TrackerRepository:
                 else:
                     updated += 1
         return added, updated
+
+    async def replace_timetable(self, student_id: UUID, items: list[dict]) -> int:
+        """Заменяет расписание целиком. Всё или ничего — в одной транзакции."""
+        async with self._db.pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "DELETE FROM timetable WHERE student_id = $1", student_id
+                )
+                return await self._insert_classes(conn, student_id, items)
+
+    async def add_classes(self, student_id: UUID, items: list[dict]) -> int:
+        async with self._db.pool.acquire() as conn:
+            async with conn.transaction():
+                return await self._insert_classes(conn, student_id, items)
+
+    @staticmethod
+    async def _insert_classes(conn, student_id: UUID, items: list[dict]) -> int:
+        if not items:
+            return 0
+        await conn.executemany(
+            """
+            INSERT INTO timetable (student_id, day, name, time, room)
+            VALUES ($1, $2, $3, $4, $5)
+            """,
+            [(student_id, i["day"], i["name"], i["time"], i["room"]) for i in items],
+        )
+        return len(items)

@@ -36,6 +36,30 @@ async function request(path, { method = "GET", body } = {}) {
   return payload;
 }
 
+/** Загрузка файла: Content-Type ставит браузер сам, вместе с границей формы. */
+async function upload(path, file) {
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(`/api${path}`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new ApiError(response.status, payload?.detail || "Не получилось прочитать файл");
+  }
+  return payload;
+}
+
 export const api = {
   login: (username, password) => request("/login", { method: "POST", body: { username, password } }),
   logout: () => request("/logout", { method: "POST" }),
@@ -55,6 +79,10 @@ export const api = {
   importTasks: (raw) => request("/tasks/import", { method: "POST", body: { raw } }),
 
   timetable: () => request("/timetable"),
+  parseScheduleHtml: (html) => request("/timetable/parse-html", { method: "POST", body: { html } }),
+  parseScheduleImage: (file) => upload("/timetable/parse-image", file),
+  saveTimetable: (classes, replace) =>
+    request("/timetable/bulk", { method: "POST", body: { classes, replace } }),
   addClass: (item) => request("/timetable", { method: "POST", body: item }),
   deleteClass: (id) => request(`/timetable/${id}`, { method: "DELETE" }),
 };
